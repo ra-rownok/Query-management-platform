@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block title %}Database Registry & Configuration - QuantumDBA{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2 class="page-title">
+            <span>Database Registry & Clusters</span>
+        </h2>
+        <div class="page-subtitle">
+            Configure target databases, assign categories, and manage engine specifications for broadcast executions.
+        </div>
+    </div>
+    {% if current_user.role == 'lead_dba' %}
+    <div style="display: flex; gap: 0.75rem;">
+        <button type="button" class="btn btn-secondary" onclick="openModal('add-category-modal')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Add Category
+        </button>
+        <button type="button" class="btn btn-primary" onclick="openModal('add-db-modal')">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Register Database
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Category summary cards -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+    {% for cat in categories %}
+    <div class="glass-panel" style="padding: 1.25rem; border-left: 4px solid {{ cat.color }};">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <h3 style="font-size: 1.05rem; font-weight: 700;">{{ cat.name }}</h3>
+            <span class="badge" style="background: rgba(255,255,255,0.06); color: var(--text-main);">
+                {{ cat.db_count }} Nodes
+            </span>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.4rem; min-height: 2.2rem;">
+            {{ cat.description or 'No description provided' }}
+        </p>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Database Table -->
+<div class="glass-panel" style="overflow: hidden;">
+    <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
+        <h3 style="font-size: 1.05rem; font-weight: 700;">Registered Database Nodes</h3>
+        <span style="font-size: 0.8rem; color: var(--text-dim);">Total: {{ databases|length }} nodes</span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Database Name</th>
+                    <th>Category</th>
+                    <th>Engine</th>
+                    <th>Host / Endpoint</th>
+                    <th>Database / Service</th>
+                    <th>User</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for db in databases %}
+                <tr>
+                    <td style="font-weight: 600; color: #fff;">
+                        {{ db.name }}
+                    </td>
+                    <td>
+                        <span class="db-tag" style="background: rgba(99,102,241,0.15); color: #818cf8; border-color: rgba(99,102,241,0.3);">
+                            {{ db.category_name }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge badge-engine-{{ db.engine|lower }}">
+                            {{ db.engine|upper }}
+                        </span>
+                    </td>
+                    <td style="color: var(--text-muted); font-size: 0.8rem;">
+                        {{ db.host }}{% if db.port %}:{{ db.port }}{% endif %}
+                    </td>
+                    <td style="color: #cbd5e1; font-weight: 500;">
+                        {{ db.database_name }}
+                    </td>
+                    <td style="color: var(--text-dim);">
+                        {{ db.username or '-' }}
+                    </td>
+                    <td>
+                        {% if db.is_enabled %}
+                            <span class="badge badge-status-success">ACTIVE</span>
+                        {% else %}
+                            <span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-dim);">DISABLED</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right;">
+                        <div style="display: inline-flex; gap: 0.4rem;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="testDbConnection({{ db.id }})">
+                                Test
+                            </button>
+                            {% if current_user.role == 'lead_dba' %}
+                            <button type="button" class="btn btn-danger btn-sm" onclick="openDeleteDbModal({{ db.id }}, '{{ db.name|replace("'", "\\'") }}')">
+                                Delete
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Add Database -->
+<div id="add-db-modal" class="modal-overlay">
+    <div class="modal-window">
+        <div class="modal-header">
+            <h3 class="modal-title">Register New Database</h3>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('add-db-modal')">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('database_create') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="add-db-name">Display Name *</label>
+                    <input type="text" id="add-db-name" name="name" class="input-custom" placeholder="e.g. Quotera Frankfurt Prod" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="add-db-category">Category / Group *</label>
+                        <select id="add-db-category" name="category_id" class="select-custom" required>
+                            {% for cat in categories %}
+                                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="add-db-engine">Database Engine *</label>
+                        <select id="add-db-engine" name="engine" class="select-custom" required onchange="toggleEngineFields(this.value)">
+                            <option value="postgresql">PostgreSQL</option>
+                            <option value="mysql">MySQL</option>
+                            <option value="oracle">Oracle</option>
+                            <option value="sqlite">SQLite (Local/File)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row" id="host-port-row">
+                    <div class="form-group">
+                        <label class="form-label" for="add-db-host">Host / IP</label>
+                        <input type="text" id="add-db-host" name="host" class="input-custom" placeholder="e.g. pg-prod.internal.net" value="localhost">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="add-db-port">Port</label>
+                        <input type="number" id="add-db-port" name="port" class="input-custom" placeholder="5432" value="5432">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="add-db-database">Database / Service Name *</label>
+                    <input type="text" id="add-db-database" name="database_name" class="input-custom" placeholder="e.g. quotera_db" required>
+                </div>
+
+                <div class="form-row" id="auth-row">
+                    <div class="form-group">
+                        <label class="form-label" for="add-db-username">Username</label>
+                        <input type="text" id="add-db-username" name="username" class="input-custom" placeholder="db_admin">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="add-db-password">Password</label>
+                        <input type="password" id="add-db-password" name="password" class="input-custom" placeholder="••••••••••••">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="add-db-options">Options / Extra Config (JSON)</label>
+                    <input type="text" id="add-db-options" name="options" class="input-custom" placeholder='{"sslmode": "require"} or {"filepath": "/path/to/db"}'>
+                </div>
+            </div>
+
+            <div style="padding: 1rem 1.5rem; background: rgba(0,0,0,0.25); border-top: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
+                <button type="button" class="btn btn-secondary" onclick="testDbConnection()">
+                    Test Connection
+                </button>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('add-db-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save to Registry</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Add Category -->
+<div id="add-category-modal" class="modal-overlay">
+    <div class="modal-window" style="max-width: 480px;">
+        <div class="modal-header">
+            <h3 class="modal-title">Create Database Category</h3>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('add-category-modal')">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('category_create') }}">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="cat-name">Category Name *</label>
+                    <input type="text" id="cat-name" name="name" class="input-custom" placeholder="e.g. Risk Analytics DB" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cat-desc">Description</label>
+                    <textarea id="cat-desc" name="description" class="input-custom" style="height: 80px;" placeholder="Purpose and SLA of databases in this group..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="cat-color">Color Badge</label>
+                    <input type="color" id="cat-color" name="color" value="#6366f1" style="width: 100%; height: 38px; border: 1px solid var(--border-subtle); background: transparent; border-radius: 6px; cursor: pointer;">
+                </div>
+            </div>
+            <div style="padding: 1rem 1.5rem; background: rgba(0,0,0,0.25); border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 0.5rem;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('add-category-modal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Category</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Confirm Delete Database -->
+<div id="delete-db-modal" class="modal-overlay">
+    <div class="modal-window" style="max-width: 480px; border-color: rgba(239, 68, 68, 0.4);">
+        <div class="modal-header" style="background: rgba(239, 68, 68, 0.08);">
+            <div style="display: flex; align-items: center; gap: 0.5rem; color: #f87171;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                <h3 class="modal-title" style="color: #f87171;">Remove Database</h3>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal('delete-db-modal')">✕</button>
+        </div>
+        <form id="delete-db-form" method="POST" action="">
+            <div class="modal-body">
+                <p style="font-size: 0.9rem; color: #cbd5e1; line-height: 1.5;">
+                    Are you sure you want to permanently remove <strong id="delete-db-name-display" style="color: #fff;"></strong> from the registry?
+                </p>
+                <div style="margin-top: 0.75rem; padding: 0.75rem; background: rgba(0, 0, 0, 0.35); border-radius: var(--radius-sm); font-size: 0.78rem; color: var(--text-dim);">
+                    ⚠️ This will revoke all DBA user permissions to this database connection.
+                </div>
+                <input type="hidden" id="delete-db-id-input" value="">
+            </div>
+            <div style="padding: 1rem 1.5rem; background: rgba(0,0,0,0.25); border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 0.5rem;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('delete-db-modal')">Cancel</button>
+                <button type="button" id="confirm-delete-btn" class="btn btn-danger" onclick="submitDeleteDatabase()">
+                    Yes, Delete Database
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let pendingDeleteDbId = null;
+
+function openDeleteDbModal(dbId, dbName) {
+    pendingDeleteDbId = dbId;
+    document.getElementById('delete-db-name-display').textContent = dbName;
+    document.getElementById('delete-db-id-input').value = dbId;
+    const form = document.getElementById('delete-db-form');
+    if (form) form.action = `/api/database/${dbId}/delete`;
+    openModal('delete-db-modal');
+}
+
+function submitDeleteDatabase() {
+    if (!pendingDeleteDbId) return;
+    const btn = document.getElementById('confirm-delete-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Deleting...';
+    }
+
+    fetch(`/api/database/${pendingDeleteDbId}/delete`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(async res => {
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success) {
+            window.location.reload();
+        } else {
+            // Fallback to standard form submit
+            const form = document.getElementById('delete-db-form');
+            if (form) form.submit();
+        }
+    })
+    .catch(() => {
+        // Fallback to standard form submit
+        const form = document.getElementById('delete-db-form');
+        if (form) form.submit();
+    });
+}
+
+function toggleEngineFields(engine) {
+    const portInput = document.getElementById('add-db-port');
+    if (engine === 'postgresql') {
+        if (portInput) portInput.value = '5432';
+    } else if (engine === 'mysql') {
+        if (portInput) portInput.value = '3306';
+    } else if (engine === 'oracle') {
+        if (portInput) portInput.value = '1521';
+    }
+}
+</script>
+{% endblock %}

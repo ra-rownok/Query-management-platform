@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}System Audit & Activity Logs - QuantumDBA{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2 class="page-title">
+            <span>Audit & Compliance Logs</span>
+        </h2>
+        <div class="page-subtitle">
+            {% if is_super_admin %}
+                Global Organization Audit: Viewing complete system activity, user logins, configuration changes, and query broadcast executions across all users.
+            {% else %}
+                Personal Activity Log: Viewing your personal logins, database connection tests, and query execution history.
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Filters Bar -->
+<div class="glass-panel" style="padding: 1rem 1.5rem; margin-bottom: 1.5rem;">
+    <form method="GET" action="{{ url_for('audit_view') }}" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 240px;">
+            <input 
+                type="text" 
+                name="search" 
+                class="input-custom" 
+                placeholder="Search by target or query details..."
+                value="{{ search_filter or '' }}"
+            >
+        </div>
+
+        <div style="width: 220px;">
+            <select name="action" class="select-custom" onchange="this.form.submit()">
+                <option value="">All Action Types</option>
+                <option value="LOGIN" {% if action_filter == 'LOGIN' %}selected{% endif %}>User Logins</option>
+                <option value="QUERY_EXECUTE" {% if action_filter == 'QUERY_EXECUTE' %}selected{% endif %}>Query Executions</option>
+                <option value="DB_CREATE" {% if action_filter == 'DB_CREATE' %}selected{% endif %}>Database Registered</option>
+                <option value="DB_UPDATE" {% if action_filter == 'DB_UPDATE' %}selected{% endif %}>Database Updated</option>
+                <option value="DB_DELETE" {% if action_filter == 'DB_DELETE' %}selected{% endif %}>Database Deleted</option>
+                <option value="USER_CREATE" {% if action_filter == 'USER_CREATE' %}selected{% endif %}>User Created</option>
+                <option value="TEST_CONNECTION" {% if action_filter == 'TEST_CONNECTION' %}selected{% endif %}>Connection Tests</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-secondary">Filter</button>
+        {% if action_filter or search_filter %}
+            <a href="{{ url_for('audit_view') }}" class="btn btn-secondary" style="color: var(--text-dim);">Reset</a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Logs Table -->
+<div class="glass-panel" style="overflow: hidden;">
+    <div style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span class="section-label">
+                {% if is_super_admin %}
+                    All System Logs ({{ logs|length }} entries)
+                {% else %}
+                    My Activity Stream ({{ logs|length }} entries for {{ current_user.username }})
+                {% endif %}
+            </span>
+            <span class="badge" style="{% if is_super_admin %}background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.3);{% else %}background: rgba(6,182,212,0.15); color: #67e8f9; border: 1px solid rgba(6,182,212,0.3);{% endif %} font-size: 0.7rem;">
+                {% if is_super_admin %}SUPER ADMIN SCOPE{% else %}PERSONAL LOGS: {{ current_user.username }}{% endif %}
+            </span>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 170px;">Timestamp (UTC)</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Target Scope</th>
+                    <th>Details / Query Payload</th>
+                    <th>Client IP</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if logs %}
+                    {% for l in logs %}
+                    <tr>
+                        <td style="color: var(--text-dim); font-size: 0.78rem;">
+                            {{ l.created_at }}
+                        </td>
+                        <td>
+                            <strong style="color: #fff;">{{ l.username }}</strong>
+                        </td>
+                        <td>
+                            <span class="badge" style="
+                                {% if 'CREATE' in l.action %}background: rgba(16, 185, 129, 0.15); color: #34d399;
+                                {% elif 'DELETE' in l.action %}background: rgba(239, 68, 68, 0.15); color: #f87171;
+                                {% elif 'QUERY' in l.action %}background: rgba(99, 102, 241, 0.15); color: #a5b4fc;
+                                {% else %}background: rgba(255, 255, 255, 0.05); color: var(--text-main);{% endif %}
+                            ">
+                                {{ l.action }}
+                            </span>
+                        </td>
+                        <td style="color: var(--accent-cyan); font-weight: 500;">
+                            {{ l.target or '-' }}
+                        </td>
+                        <td style="max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.78rem; color: #cbd5e1;">
+                            {{ l.details or '-' }}
+                        </td>
+                        <td style="color: var(--text-dim); font-size: 0.78rem;">
+                            {{ l.ip_address }}
+                        </td>
+                        <td>
+                            <span class="badge {% if l.status == 'SUCCESS' %}badge-status-success{% elif l.status == 'PARTIAL' %}badge-status-partial{% else %}badge-status-failed{% endif %}">
+                                {{ l.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 2.5rem; color: var(--text-dim);">
+                            No audit logs match your search criteria.
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

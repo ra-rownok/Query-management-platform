@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Multi-Database Query Studio - QuantumDBA{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2 class="page-title">
+            <span>Query Execution Studio</span>
+        </h2>
+        <div class="page-subtitle">
+            Execute SQL queries across individual databases, category clusters, or all registered engines simultaneously.
+        </div>
+    </div>
+    <div style="display: flex; gap: 0.75rem; align-items: center;">
+        <span class="badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3);">
+            {{ databases|length }} Registered DBs
+        </span>
+        <span class="badge" style="background: rgba(14, 165, 233, 0.15); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.3);">
+            {{ categories|length }} Categories
+        </span>
+    </div>
+</div>
+
+<div class="query-studio-layout">
+    <!-- Targeting Selector Card -->
+    <div class="glass-panel targeting-box">
+        <div class="targeting-header">
+            <span class="section-label">Target Scope Selection</span>
+            <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-muted);">
+                <span>Target Engine Filter:</span>
+                <select id="engine-filter-select" class="select-custom" style="width: auto; padding: 0.35rem 0.75rem; font-size: 0.78rem;">
+                    <option value="all">All Engines</option>
+                    {% for eng in engines %}
+                        <option value="{{ eng|lower }}">{{ eng }} Only</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <!-- Segmented Control for Target Mode -->
+        <div class="target-segmented-control">
+            <button type="button" class="target-segment-btn" data-target-type="single">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                </svg>
+                Individual Database
+            </button>
+            <button type="button" class="target-segment-btn active" data-target-type="category">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                </svg>
+                Category Group (e.g. All Quotera DBs)
+            </button>
+            <button type="button" class="target-segment-btn" data-target-type="all">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polygon points="12 8 8 12 12 16 12 8"></polygon>
+                </svg>
+                All Registered Databases
+            </button>
+        </div>
+
+        <!-- Dynamic Inputs according to mode -->
+        <div class="targeting-dynamic-inputs">
+            <!-- Mode 1: Individual Database -->
+            <div id="single-db-container" style="display: none;">
+                <label class="form-label">Select Specific Target Database:</label>
+                <select id="target-db-select" class="select-custom">
+                    {% for db in databases %}
+                        {% if db.is_enabled %}
+                            <option value="{{ db.id }}" data-engine="{{ db.engine }}">
+                                {{ db.name }} [{{ db.category_name }} &bull; {{ db.engine|upper }} &bull; {{ (db.permission_level or 'read_write')|replace('_', ' ')|upper }}]
+                            </option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Mode 2: Category Group -->
+            <div id="category-container">
+                <label class="form-label">Select Target Category Group:</label>
+                <select id="target-category-select" class="select-custom">
+                    {% for cat in categories %}
+                        <option value="{{ cat.id }}">
+                            All {{ cat.name }} Nodes ({{ cat.db_count }} active databases)
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Target Summary Pill -->
+            <div class="target-summary-pill">
+                <div>
+                    <span style="color: var(--text-dim);">Resolved Target Scope:</span>
+                    <strong id="target-count-badge" style="color: var(--accent-cyan); margin-left: 0.5rem;">Calculating...</strong>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-dim);">Concurrent execution enabled</div>
+            </div>
+        </div>
+
+        <!-- Active DB Target Pills preview -->
+        <div id="targeted-db-tags" class="target-db-tags">
+            <!-- populated by JS -->
+        </div>
+    </div>
+
+    <!-- SQL Editor Card -->
+    <div class="glass-panel editor-card">
+        <div class="editor-toolbar">
+            <div class="quick-templates-bar">
+                <span style="font-size: 0.75rem; color: var(--text-dim); margin-right: 0.2rem;">Quick Queries:</span>
+                <button type="button" class="btn-template" data-sql="SELECT symbol, bid_price, ask_price, volume, source, last_updated FROM market_quotes ORDER BY volume DESC LIMIT 10;">
+                    📈 Market Quotes (Quotera)
+                </button>
+                <button type="button" class="btn-template" data-sql="SELECT order_id, account_id, symbol, side, quantity, price, status, execution_venue FROM orders ORDER BY created_at DESC LIMIT 10;">
+                    ⚡ Trade Orders (Trade DB)
+                </button>
+                <button type="button" class="btn-template" data-sql="SELECT settlement_id, trade_ref, counterparty, amount_usd, status, settle_date FROM settlements;">
+                    🏦 Settlements (Backoffice)
+                </button>
+                <button type="button" class="btn-template" data-sql="SELECT 1 as heartbeat, CURRENT_TIMESTAMP as server_time;">
+                    ⏱️ Engine Ping
+                </button>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem;">
+                <button type="button" id="btn-clear-query" class="btn btn-secondary btn-sm">Clear</button>
+            </div>
+        </div>
+
+        <div class="sql-editor-container">
+            <textarea 
+                id="sql-query-input" 
+                class="sql-textarea" 
+                placeholder="Enter SQL statement to broadcast across target databases (e.g. SELECT * FROM market_quotes;)..."
+                spellcheck="false"
+            >SELECT symbol, bid_price, ask_price, volume, source, last_updated FROM market_quotes ORDER BY volume DESC LIMIT 10;</textarea>
+        </div>
+
+        <!-- Engine Dialect Warnings Container -->
+        <div id="engine-warnings-area" style="display: none;"></div>
+
+        <div class="editor-actions-bar">
+            <div style="color: var(--text-dim); font-size: 0.78rem; display: flex; align-items: center; gap: 0.4rem;">
+                <kbd style="background: rgba(255,255,255,0.06); padding: 0.15rem 0.4rem; border-radius: 4px; border: 1px solid var(--border-subtle); font-family: var(--font-mono);">Ctrl + Enter</kbd>
+                <span>to execute query across targets</span>
+            </div>
+
+            <button type="button" id="btn-run-query" class="btn btn-primary" style="padding: 0.75rem 1.75rem; font-size: 0.95rem;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                Execute Query
+            </button>
+        </div>
+    </div>
+
+    <!-- Execution Results Card -->
+    <div id="query-results-card" class="glass-panel results-card">
+        <div id="results-header-summary" class="results-header-summary">
+            <!-- populated by JS -->
+        </div>
+
+        <div id="db-results-container" class="db-results-container">
+            <!-- populated by JS -->
+        </div>
+    </div>
+
+    <!-- Recent Query History Drawer/Accordion -->
+    {% if recent_history %}
+    <div class="glass-panel" style="padding: 1.25rem 1.5rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+            <span class="section-label">Recent Multi-Database Broadcasts</span>
+            <span style="font-size: 0.75rem; color: var(--text-dim);">Last 10 executions</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            {% for item in recent_history %}
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.85rem; background: rgba(0,0,0,0.25); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); font-size: 0.82rem;">
+                <div style="display: flex; align-items: center; gap: 0.75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    <span class="badge {% if item.failed_count == 0 %}badge-status-success{% elif item.success_count > 0 %}badge-status-partial{% else %}badge-status-failed{% endif %}">
+                        {{ item.success_count }}/{{ item.target_count }} OK
+                    </span>
+                    <code style="color: #cbd5e1; font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; max-width: 500px;">
+                        {{ item.query_text }}
+                    </code>
+                </div>
+                <div style="display: flex; align-items: center; gap: 1rem; flex-shrink: 0;">
+                    <span style="color: var(--text-dim); font-size: 0.75rem;">{{ item.total_duration_ms }} ms</span>
+                    <button class="btn btn-secondary btn-sm" onclick="document.getElementById('sql-query-input').value = '{{ item.query_text|replace("'", "\\'")|replace('\n', ' ') }}'; runQuery();">
+                        Rerun
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Embed database registry for fast dynamic target resolution on client side
+    window.PLATFORM_DATABASES = {{ databases|tojson }};
+    window.PLATFORM_CATEGORIES = {{ categories|tojson }};
+</script>
+{% endblock %}
