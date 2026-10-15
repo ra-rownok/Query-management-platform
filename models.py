@@ -226,6 +226,13 @@ class UserModel:
             conn.commit()
 
     @staticmethod
+    def delete(user_id):
+        with get_db_connection() as conn:
+            conn.execute("DELETE FROM user_db_permissions WHERE user_id = ?", (user_id,))
+            conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            conn.commit()
+
+    @staticmethod
     def verify_password(stored_hash, password):
         if stored_hash.startswith("sha256$"):
             import hashlib

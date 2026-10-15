@@ -12,6 +12,11 @@ class TestQueryManagementPlatform(unittest.TestCase):
         self.client = app.test_client()
         # Initialize test data
         setup_demo_environment()
+        # Clean up transient test users for test isolation
+        for test_user in ['trader_tina', 'inactive_user_ian', 'auditor_bob']:
+            existing = UserModel.get_by_username(test_user)
+            if existing:
+                UserModel.delete(existing['id'])
 
     def login_as_admin(self):
         return self.client.post('/login', data={
