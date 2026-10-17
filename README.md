@@ -98,7 +98,7 @@ Track system activity with action filters (`LOGIN`, `QUERY_EXECUTE`, `DB_CREATE`
 
 ### Prerequisites
 - Python 3.9+
-- SQLite3
+- PostgreSQL 12+
 
 ### 1. Clone & Set Up Virtual Environment
 ```bash
@@ -113,13 +113,27 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Initialize Seed Databases & Super Admin Account
+### 2. Configure Application Database Engine (PostgreSQL)
+The platform uses **PostgreSQL** exclusively for its internal metadata (users, categories, database connections, permissions, audit logs, and query history).
+
+Set your PostgreSQL connection details in `.env`:
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your PostgreSQL connection URI (default port: `5432`):
+```env
+DATABASE_URL=postgresql://username:password@localhost:5432/platform_db
+```
+*(Alternatively, configure individual parameters: `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_SCHEMA`).
+
+### 3. Initialize Database & Seed Administrator
+To provision all tables and seed the default administrator account:
 ```bash
 python3 init_db.py
 ```
-This initializes the metadata database and preloads realistic sample financial databases (`Quotera NY`, `Quotera London`, `Quotera Tokyo`, `Trade Execution Primary`, `Backoffice Settlement Main`) along with connection templates for PostgreSQL, MySQL, and Oracle.
 
-### 3. Run Application Server
+### 4. Run Application Server
 ```bash
 python3 app.py
 ```
@@ -153,7 +167,7 @@ python3 -m unittest tests/test_platform.py
 ├── app.py                     # Flask application routes, decorators & auth
 ├── models.py                  # Database schemas, UserModel, PermissionModel, AuditModel
 ├── db_manager.py              # Engine dialect helper, connection factory, concurrent executor
-├── init_db.py                 # Initial database seeder and demo financial nodes
+├── init_db.py                 # PostgreSQL table provisioning & default admin seeder
 ├── requirements.txt           # Python dependencies
 ├── docs/
 │   └── screenshots/           # Application screenshots and visual assets

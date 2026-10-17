@@ -2,21 +2,13 @@ import os
 import unittest
 import json
 from app import app
-from models import init_app_database, UserModel, CategoryModel, DatabaseModel, AuditModel
-from init_db import setup_demo_environment
+from models import CategoryModel, DatabaseModel, AuditModel
 
 class TestQueryManagementPlatform(unittest.TestCase):
     def setUp(self):
         app.config['TESTING'] = True
         app.config['SECRET_KEY'] = 'test-secret-key'
         self.client = app.test_client()
-        # Initialize test data
-        # setup_demo_environment()
-        # Clean up transient test users for test isolation
-        for test_user in ['trader_tina', 'inactive_user_ian', 'auditor_bob']:
-            existing = UserModel.get_by_username(test_user)
-            if existing:
-                UserModel.delete(existing['id'])
 
     def login_as_admin(self):
         return self.client.post('/login', data={
@@ -135,10 +127,12 @@ class TestQueryManagementPlatform(unittest.TestCase):
 
     def test_07_engine_awareness_analyzer(self):
         self.login_as_admin()
+        cats = CategoryModel.list_all()
+        cat_id = cats[0]['id'] if cats else 1
         payload = {
             'query': 'SELECT * FROM orders WHERE name ILIKE `test` LIMIT 10;',
             'target_type': 'category',
-            'target_id': 1
+            'target_id': cat_id
         }
         res = self.client.post('/api/analyze-query',
                                data=json.dumps(payload),

@@ -62,9 +62,9 @@
                     My Activity Stream ({{ logs|length }} entries for {{ current_user.username }})
                 {% endif %}
             </span>
-            <span class="badge" style="{% if is_super_admin %}background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.3);{% else %}background: rgba(6,182,212,0.15); color: #67e8f9; border: 1px solid rgba(6,182,212,0.3);{% endif %} font-size: 0.7rem;">
+            <!-- <span class="badge" style="{% if is_super_admin %}background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.3);{% else %}background: rgba(6,182,212,0.15); color: #67e8f9; border: 1px solid rgba(6,182,212,0.3);{% endif %} font-size: 0.7rem;">
                 {% if is_super_admin %}SUPER ADMIN SCOPE{% else %}PERSONAL LOGS: {{ current_user.username }}{% endif %}
-            </span>
+            </span> -->
         </div>
     </div>
 
