@@ -6,7 +6,105 @@ document.addEventListener('DOMContentLoaded', () => {
     initTargetingControls();
     initSqlEditor();
     initQuickTemplates();
+    initAutoToasts();
 });
+
+// Toast Notification Engine
+window.showToast = function(message, type = 'info', duration = 4500, title = null) {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'toast-container';
+        container.setAttribute('aria-live', 'polite');
+        container.setAttribute('aria-atomic', 'true');
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast-item toast-${type}`;
+    
+    let icon = 'ℹ';
+    let defaultTitle = 'Notification';
+    if (type === 'success') {
+        icon = '✓';
+        defaultTitle = title || 'Success';
+    } else if (type === 'error' || type === 'danger') {
+        icon = '✕';
+        defaultTitle = title || 'Error';
+    } else if (type === 'warning') {
+        icon = '⚠';
+        defaultTitle = title || 'Warning';
+    } else {
+        icon = 'ℹ';
+        defaultTitle = title || 'Information';
+    }
+
+    toast.innerHTML = `
+        <div class="toast-icon">${icon}</div>
+        <div class="toast-content">
+            <div class="toast-title">${escapeHtml(defaultTitle)}</div>
+            <div class="toast-message">${escapeHtml(message)}</div>
+        </div>
+        <button type="button" class="toast-close" aria-label="Close">&times;</button>
+    `;
+
+    container.appendChild(toast);
+    setupToastDismiss(toast, duration);
+    return toast;
+};
+
+function setupToastDismiss(toast, duration = 4500) {
+    if (!toast) return;
+    let dismissTimeout;
+    let remainingTime = duration;
+    let startTime = Date.now();
+
+    function dismiss() {
+        toast.classList.add('toast-hiding');
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 280);
+    }
+
+    const startTimer = () => {
+        startTime = Date.now();
+        dismissTimeout = setTimeout(dismiss, remainingTime);
+    };
+
+    const pauseTimer = () => {
+        clearTimeout(dismissTimeout);
+        remainingTime -= (Date.now() - startTime);
+        if (remainingTime < 500) remainingTime = 500;
+    };
+
+    const closeBtn = toast.querySelector('.toast-close');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            clearTimeout(dismissTimeout);
+            dismiss();
+        });
+    }
+
+    toast.addEventListener('mouseenter', pauseTimer);
+    toast.addEventListener('mouseleave', () => {
+        if (remainingTime > 0) startTimer();
+    });
+
+    if (duration > 0) {
+        startTimer();
+    }
+}
+
+function initAutoToasts() {
+    document.querySelectorAll('[data-auto-toast="true"]').forEach(toast => {
+        setupToastDismiss(toast, 4500);
+    });
+}
+
 
 // Global state
 let currentTargetType = 'category'; // 'single' | 'category' | 'all'
@@ -209,6 +307,7 @@ function initQuickTemplates() {
     });
 }
 
+window.runQuery = runQuery;
 function runQuery() {
     const editor = document.getElementById('sql-query-input');
     const runBtn = document.getElementById('btn-run-query');
@@ -219,7 +318,7 @@ function runQuery() {
     if (!editor) return;
     const query = editor.value.trim();
     if (!query) {
-        alert('Please enter a SQL query to execute.');
+        showToast('Please enter a SQL query to execute.', 'warning', 4000, 'Query Required');
         editor.focus();
         return;
     }
@@ -445,6 +544,7 @@ window.exportResultToCSV = function(idx) {
 
     const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
     downloadBlob(blob, `${res.db_name}_result_${Date.now()}.csv`);
+    showToast(`Exported ${res.db_name} results to CSV`, 'info', 3000, 'Export Complete');
 };
 
 window.exportResultToJSON = function(idx) {
@@ -452,6 +552,7 @@ window.exportResultToJSON = function(idx) {
     if (!res || !res.rows) return;
     const blob = new Blob([JSON.stringify(res.rows, null, 2)], { type: 'application/json' });
     downloadBlob(blob, `${res.db_name}_result_${Date.now()}.json`);
+    showToast(`Exported ${res.db_name} results to JSON`, 'info', 3000, 'Export Complete');
 };
 
 function downloadBlob(blob, filename) {
@@ -477,8 +578,8 @@ window.closeModal = function(modalId) {
 };
 
 // Test Connection for Registry Page
-window.testDbConnection = function(dbId = null) {
-    const btn = event?.target;
+window.testDbConnection = function(dbId = null, btnElement = null) {
+    const btn = btnElement || (typeof event !== 'undefined' ? event?.target : null);
     let originalText = '';
     if (btn) {
         originalText = btn.innerHTML;
@@ -510,13 +611,13 @@ window.testDbConnection = function(dbId = null) {
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-            alert(`✓ Connection Successful!\n${data.message} (${data.duration_ms} ms)`);
+            showToast(`${data.message} (${data.duration_ms} ms)`, 'success', 5000, 'Connection Successful');
         } else {
-            alert(`✗ Connection Failed!\n${data.message} (${data.duration_ms} ms)`);
+            showToast(`${data.message} (${data.duration_ms} ms)`, 'error', 6000, 'Connection Failed');
         }
     })
     .catch(err => {
-        alert(`Connection test error: ${err.message}`);
+        showToast(`Connection test error: ${err.message}`, 'error', 6000, 'Connection Test Error');
     })
     .finally(() => {
         if (btn) {

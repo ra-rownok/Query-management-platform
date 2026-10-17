@@ -16,8 +16,13 @@
         </div>
 
         {% if error %}
-            <div class="flash-message flash-error" style="margin-bottom: 1.25rem;">
-                {{ error }}
+            <div class="toast-item toast-error toast-visible" style="margin-bottom: 1.5rem; width: 100%; box-shadow: none;">
+                <div class="toast-icon">✕</div>
+                <div class="toast-content">
+                    <div class="toast-title">Authentication Failed</div>
+                    <div class="toast-message">{{ error }}</div>
+                </div>
+                <button type="button" class="toast-close" onclick="this.closest('.toast-item').remove()" aria-label="Close">&times;</button>
             </div>
         {% endif %}
 

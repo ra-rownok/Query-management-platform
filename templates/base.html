@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Multi-Database Query Platform{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=toast2">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
 </head>
 <body>
@@ -79,21 +79,33 @@
     </nav>
     {% endif %}
 
-    <main class="main-content">
+    <!-- Floating Toast Notification Container -->
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                <div class="flash-container">
-                    {% for category, message in messages %}
-                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
-                    {% endfor %}
-                </div>
+                {% for category, message in messages %}
+                    <div class="toast-item toast-{{ category }} toast-visible" data-auto-toast="true">
+                        <div class="toast-icon">
+                            {% if category == 'success' %}✓{% elif category in ['error', 'danger'] %}✕{% elif category == 'warning' %}⚠{% else %}ℹ{% endif %}
+                        </div>
+                        <div class="toast-content">
+                            <div class="toast-title">
+                                {% if category == 'success' %}Success{% elif category in ['error', 'danger'] %}Notice{% elif category == 'warning' %}Warning{% else %}Information{% endif %}
+                            </div>
+                            <div class="toast-message">{{ message }}</div>
+                        </div>
+                        <button type="button" class="toast-close" onclick="this.closest('.toast-item').remove()" aria-label="Close">&times;</button>
+                    </div>
+                {% endfor %}
             {% endif %}
         {% endwith %}
+    </div>
 
+    <main class="main-content">
         {% block content %}{% endblock %}
     </main>
 
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=toast2"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
