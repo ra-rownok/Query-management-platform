@@ -45,7 +45,7 @@
                 {% for u in users %}
                 <tr>
                     <td style="color: var(--text-dim);">#{{ u.id }}</td>
-                    <td style="font-weight: 600; color: #fff;">{{ u.username }}</td>
+                    <td style="font-weight: 600; color: var(--text-main);">{{ u.username }}</td>
                     <td style="color: #cbd5e1;">{{ u.full_name or '-' }}</td>
                     <td>
                         <span class="badge" style="
@@ -180,7 +180,7 @@
                             <tbody>
                                 {% for db in all_dbs %}
                                 <tr>
-                                    <td style="font-weight: 600; color: #fff;">{{ db.name }}</td>
+                                    <td style="font-weight: 600; color: var(--text-main);">{{ db.name }}</td>
                                     <td><span class="db-tag">{{ db.category_name }}</span></td>
                                     <td><span class="badge badge-engine-{{ db.engine|lower }}">{{ db.engine|upper }}</span></td>
                                     <td style="text-align: right;">
@@ -284,7 +284,7 @@
                             <tbody>
                                 {% for db in all_dbs %}
                                 <tr>
-                                    <td style="font-weight: 600; color: #fff;">{{ db.name }}</td>
+                                    <td style="font-weight: 600; color: var(--text-main);">{{ db.name }}</td>
                                     <td><span class="db-tag">{{ db.category_name }}</span></td>
                                     <td><span class="badge badge-engine-{{ db.engine|lower }}">{{ db.engine|upper }}</span></td>
                                     <td style="text-align: right;">

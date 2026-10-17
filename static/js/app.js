@@ -4,6 +4,7 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     try {
+        initTheme();
         initTargetingControls();
         initSqlEditor();
         initQuickTemplates();
@@ -12,6 +13,29 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Initialization error:', e);
     }
 });
+
+// Theme Management System
+window.initTheme = function() {
+    try {
+        const saved = localStorage.getItem('quantum_theme');
+        const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+        const theme = saved ? saved : (prefersLight ? 'light' : 'dark');
+        document.documentElement.setAttribute('data-theme', theme);
+    } catch (err) {
+        console.error('Error initializing theme:', err);
+    }
+};
+
+window.toggleTheme = function() {
+    try {
+        const current = document.documentElement.getAttribute('data-theme') || 'dark';
+        const next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('quantum_theme', next);
+    } catch (err) {
+        console.error('Error toggling theme:', err);
+    }
+};
 
 // Toast Notification Engine
 window.showToast = function(message, type = 'info', duration = 4500, title = null) {

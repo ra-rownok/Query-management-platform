@@ -73,7 +73,7 @@
             <tbody>
                 {% for db in databases %}
                 <tr>
-                    <td style="font-weight: 600; color: #fff;">
+                    <td style="font-weight: 600; color: var(--text-main);">
                         {{ db.name }}
                     </td>
                     <td>
@@ -249,7 +249,7 @@
         <form id="delete-db-form" method="POST" action="">
             <div class="modal-body">
                 <p style="font-size: 0.9rem; color: #cbd5e1; line-height: 1.5;">
-                    Are you sure you want to permanently remove <strong id="delete-db-name-display" style="color: #fff;"></strong> from the registry?
+                    Are you sure you want to permanently remove <strong id="delete-db-name-display" style="color: var(--text-main);"></strong> from the registry?
                 </p>
                 <div style="margin-top: 0.75rem; padding: 0.75rem; background: rgba(0, 0, 0, 0.35); border-radius: var(--radius-sm); font-size: 0.78rem; color: var(--text-dim);">
                     ⚠️ This will revoke all DBA user permissions to this database connection.
