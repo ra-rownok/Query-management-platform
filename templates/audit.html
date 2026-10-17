@@ -104,8 +104,8 @@
                         <td style="color: var(--accent-cyan); font-weight: 500;">
                             {{ l.target or '-' }}
                         </td>
-                        <td style="max-width: 420px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.78rem; color: #cbd5e1;">
-                            {{ l.details or '-' }}
+                        <td class="log-details-cell">
+                            <div class="log-details-text">{{ l.details or '-' }}</div>
                         </td>
                         <td style="color: var(--text-dim); font-size: 0.78rem;">
                             {{ l.ip_address }}

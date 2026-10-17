@@ -26,7 +26,7 @@
             </div>
         {% endif %}
 
-        <form method="POST" action="{{ url_for('login') }}">
+        <form method="POST" action="{{ url_for('login') }}" onsubmit="const btn = this.querySelector('button[type=submit]'); if (btn && btn.disabled) return false; if (btn) { btn.disabled = true; btn.innerText = 'Authenticating...'; } return true;">
             <div class="form-group">
                 <label class="form-label" for="username">DBA Username</label>
                 <input 

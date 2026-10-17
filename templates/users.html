@@ -312,65 +312,83 @@
 
 <script>
 function setPresetPermissions(prefix, level) {
-    const selects = document.querySelectorAll(`.${prefix}-perm-select`);
-    selects.forEach(sel => {
-        if (level === 'none') {
-            sel.value = '';
-        } else {
-            sel.value = level;
-        }
-    });
+    try {
+        const selects = document.querySelectorAll(`.${prefix}-perm-select`);
+        selects.forEach(sel => {
+            if (level === 'none') {
+                sel.value = '';
+            } else {
+                sel.value = level;
+            }
+        });
+    } catch (err) {
+        console.error('Error applying preset permissions:', err);
+    }
 }
 
 function handleRoleChange(role, prefix) {
-    const permSection = document.getElementById(`${prefix}-perm-section`);
-    if (role === 'lead_dba') {
-        if (permSection) permSection.style.display = 'none';
-    } else {
-        if (permSection) permSection.style.display = 'block';
-        if (role === 'auditor') {
-            // Disable read_write options for auditor
-            const selects = document.querySelectorAll(`.${prefix}-perm-select`);
-            selects.forEach(sel => {
-                if (sel.value === 'read_write') sel.value = 'read_only';
-                const rwOption = sel.querySelector('option[value="read_write"]');
-                if (rwOption) rwOption.disabled = true;
-            });
+    try {
+        const permSection = document.getElementById(`${prefix}-perm-section`);
+        if (role === 'lead_dba') {
+            if (permSection) permSection.style.display = 'none';
         } else {
-            const selects = document.querySelectorAll(`.${prefix}-perm-select`);
-            selects.forEach(sel => {
-                const rwOption = sel.querySelector('option[value="read_write"]');
-                if (rwOption) rwOption.disabled = false;
-            });
+            if (permSection) permSection.style.display = 'block';
+            if (role === 'auditor') {
+                // Disable read_write options for auditor
+                const selects = document.querySelectorAll(`.${prefix}-perm-select`);
+                selects.forEach(sel => {
+                    if (sel.value === 'read_write') sel.value = 'read_only';
+                    const rwOption = sel.querySelector('option[value="read_write"]');
+                    if (rwOption) rwOption.disabled = true;
+                });
+            } else {
+                const selects = document.querySelectorAll(`.${prefix}-perm-select`);
+                selects.forEach(sel => {
+                    const rwOption = sel.querySelector('option[value="read_write"]');
+                    if (rwOption) rwOption.disabled = false;
+                });
+            }
         }
+    } catch (err) {
+        console.error('Error handling role change:', err);
     }
 }
 
 function openEditUserModal(user) {
-    const form = document.getElementById('edit-user-form');
-    form.action = `/api/user/${user.id}/update`;
-    document.getElementById('edit-username').value = user.username;
-    document.getElementById('edit-fullname').value = user.full_name || '';
-    document.getElementById('edit-role').value = user.role;
-    document.getElementById('edit-status').value = user.is_active ? "1" : "0";
-    document.getElementById('edit-password').value = '';
+    try {
+        const form = document.getElementById('edit-user-form');
+        if (form) form.action = `/api/user/${user.id}/update`;
+        const usernameInput = document.getElementById('edit-username');
+        if (usernameInput) usernameInput.value = user.username;
+        const fullnameInput = document.getElementById('edit-fullname');
+        if (fullnameInput) fullnameInput.value = user.full_name || '';
+        const roleSelect = document.getElementById('edit-role');
+        if (roleSelect) roleSelect.value = user.role;
+        const statusSelect = document.getElementById('edit-status');
+        if (statusSelect) statusSelect.value = user.is_active ? "1" : "0";
+        const passwordInput = document.getElementById('edit-password');
+        if (passwordInput) passwordInput.value = '';
 
-    // Populate permissions
-    const perms = user.permissions || {};
-    const selects = document.querySelectorAll('.edit-perm-select');
-    selects.forEach(sel => {
-        sel.value = '';
-    });
+        // Populate permissions
+        const perms = user.permissions || {};
+        const selects = document.querySelectorAll('.edit-perm-select');
+        selects.forEach(sel => {
+            sel.value = '';
+        });
 
-    for (const [dbId, permLevel] of Object.entries(perms)) {
-        const sel = document.getElementById(`edit_perm_db_${dbId}`);
-        if (sel) {
-            sel.value = permLevel;
+        for (const [dbId, permLevel] of Object.entries(perms)) {
+            const sel = document.getElementById(`edit_perm_db_${dbId}`);
+            if (sel) {
+                sel.value = permLevel;
+            }
         }
-    }
 
-    handleRoleChange(user.role, 'edit');
-    openModal('edit-user-modal');
+        handleRoleChange(user.role, 'edit');
+        openModal('edit-user-modal');
+    } catch (err) {
+        console.error('Error opening edit user modal:', err);
+        showToast('Error displaying user edit dialog', 'error');
+    }
 }
 </script>
 {% endblock %}

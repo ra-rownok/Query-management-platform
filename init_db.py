@@ -7,23 +7,26 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEMO_DB_DIR = os.path.join(BASE_DIR, 'instance', 'demo_dbs')
 
 def create_sample_sqlite_db(filepath, schema_sql, seed_sql):
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    conn = sqlite3.connect(filepath)
-    cursor = conn.cursor()
-    cursor.executescript(schema_sql)
-    # Check if table already has rows, if so don't re-insert duplicates
-    tables = [r[0] for r in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
-    has_data = False
-    for t in tables:
-        if t != 'sqlite_sequence':
-            cnt = cursor.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
-            if cnt > 0:
-                has_data = True
-                break
-    if not has_data:
-        cursor.executescript(seed_sql)
-    conn.commit()
-    conn.close()
+    try:
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        conn = sqlite3.connect(filepath)
+        cursor = conn.cursor()
+        cursor.executescript(schema_sql)
+        # Check if table already has rows, if so don't re-insert duplicates
+        tables = [r[0] for r in cursor.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        has_data = False
+        for t in tables:
+            if t != 'sqlite_sequence':
+                cnt = cursor.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+                if cnt > 0:
+                    has_data = True
+                    break
+        if not has_data:
+            cursor.executescript(seed_sql)
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Error creating sample SQLite DB at {filepath}: {e}")
 
 def setup_demo_environment():
     # 1. Initialize metadata tables

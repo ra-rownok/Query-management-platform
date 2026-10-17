@@ -270,54 +270,71 @@
 let pendingDeleteDbId = null;
 
 function openDeleteDbModal(dbId, dbName) {
-    pendingDeleteDbId = dbId;
-    document.getElementById('delete-db-name-display').textContent = dbName;
-    document.getElementById('delete-db-id-input').value = dbId;
-    const form = document.getElementById('delete-db-form');
-    if (form) form.action = `/api/database/${dbId}/delete`;
-    openModal('delete-db-modal');
+    try {
+        pendingDeleteDbId = dbId;
+        const nameDisplay = document.getElementById('delete-db-name-display');
+        if (nameDisplay) nameDisplay.textContent = dbName;
+        const idInput = document.getElementById('delete-db-id-input');
+        if (idInput) idInput.value = dbId;
+        const form = document.getElementById('delete-db-form');
+        if (form) form.action = `/api/database/${dbId}/delete`;
+        openModal('delete-db-modal');
+    } catch (err) {
+        console.error('Error opening delete db modal:', err);
+        showToast('Error displaying delete modal', 'error');
+    }
 }
 
 function submitDeleteDatabase() {
-    if (!pendingDeleteDbId) return;
-    const btn = document.getElementById('confirm-delete-btn');
-    if (btn) {
-        btn.disabled = true;
-        btn.textContent = 'Deleting...';
-    }
-
-    fetch(`/api/database/${pendingDeleteDbId}/delete`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
+    try {
+        if (!pendingDeleteDbId) return;
+        const btn = document.getElementById('confirm-delete-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Deleting...';
         }
-    })
-    .then(async res => {
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data.success) {
-            window.location.reload();
-        } else {
+
+        fetch(`/api/database/${pendingDeleteDbId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(async res => {
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.success) {
+                window.location.reload();
+            } else {
+                // Fallback to standard form submit
+                const form = document.getElementById('delete-db-form');
+                if (form) form.submit();
+            }
+        })
+        .catch(() => {
             // Fallback to standard form submit
             const form = document.getElementById('delete-db-form');
             if (form) form.submit();
-        }
-    })
-    .catch(() => {
-        // Fallback to standard form submit
+        });
+    } catch (err) {
+        console.error('Error submitting delete database:', err);
         const form = document.getElementById('delete-db-form');
         if (form) form.submit();
-    });
+    }
 }
 
 function toggleEngineFields(engine) {
-    const portInput = document.getElementById('add-db-port');
-    if (engine === 'postgresql') {
-        if (portInput) portInput.value = '5432';
-    } else if (engine === 'mysql') {
-        if (portInput) portInput.value = '3306';
-    } else if (engine === 'oracle') {
-        if (portInput) portInput.value = '1521';
+    try {
+        const portInput = document.getElementById('add-db-port');
+        if (engine === 'postgresql') {
+            if (portInput) portInput.value = '5432';
+        } else if (engine === 'mysql') {
+            if (portInput) portInput.value = '3306';
+        } else if (engine === 'oracle') {
+            if (portInput) portInput.value = '1521';
+        }
+    } catch (err) {
+        console.error('Error toggling engine fields:', err);
     }
 }
 </script>

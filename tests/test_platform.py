@@ -11,7 +11,7 @@ class TestQueryManagementPlatform(unittest.TestCase):
         app.config['SECRET_KEY'] = 'test-secret-key'
         self.client = app.test_client()
         # Initialize test data
-        setup_demo_environment()
+        # setup_demo_environment()
         # Clean up transient test users for test isolation
         for test_user in ['trader_tina', 'inactive_user_ian', 'auditor_bob']:
             existing = UserModel.get_by_username(test_user)
@@ -137,7 +137,8 @@ class TestQueryManagementPlatform(unittest.TestCase):
         self.login_as_admin()
         payload = {
             'query': 'SELECT * FROM orders WHERE name ILIKE `test` LIMIT 10;',
-            'target_type': 'all'
+            'target_type': 'category',
+            'target_id': 1
         }
         res = self.client.post('/api/analyze-query',
                                data=json.dumps(payload),
