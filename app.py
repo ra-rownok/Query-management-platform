@@ -15,8 +15,28 @@ app.secret_key = os.environ.get('SECRET_KEY', 'multi-db-quant-dba-secret-key-202
 def login_required(view):
     @functools.wraps(view)
     def wrapped_view(**kwargs):
-        if 'user_id' not in session:
-            return redirect(url_for('login', next=request.url))
+        if not getattr(g, 'user', None) or 'user_id' not in session:
+            was_deactivated = getattr(g, 'was_deactivated', False)
+            session.clear()
+            
+            # API / AJAX JSON request
+            if request.path.startswith('/api/') or request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                msg = 'Your account has been deactivated by an administrator.' if was_deactivated else 'Authentication required. Please log in.'
+                return jsonify({
+                    'success': False,
+                    'error': msg,
+                    'redirect': url_for('login')
+                }), 401
+            
+            # Standard browser navigation
+            if was_deactivated:
+                flash('Your account has been deactivated by an administrator. Please contact your system DBA.', 'error')
+                return redirect(url_for('login'))
+            
+            # Clean redirect without '?next=' if accessing root dashboard
+            if request.path in ('/', url_for('dashboard')):
+                return redirect(url_for('login'))
+            return redirect(url_for('login', next=request.path))
         return view(**kwargs)
     return wrapped_view
 
@@ -24,9 +44,29 @@ def login_required(view):
 def lead_dba_required(view):
     @functools.wraps(view)
     def wrapped_view(**kwargs):
-        if 'user_id' not in session:
-            return redirect(url_for('login', next=request.url))
-        if not g.user or g.user.get('role') != 'lead_dba':
+        if not getattr(g, 'user', None) or 'user_id' not in session:
+            was_deactivated = getattr(g, 'was_deactivated', False)
+            session.clear()
+            
+            if request.path.startswith('/api/') or request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                msg = 'Your account has been deactivated by an administrator.' if was_deactivated else 'Authentication required. Please log in.'
+                return jsonify({
+                    'success': False,
+                    'error': msg,
+                    'redirect': url_for('login')
+                }), 401
+            
+            if was_deactivated:
+                flash('Your account has been deactivated by an administrator. Please contact your system DBA.', 'error')
+                return redirect(url_for('login'))
+                
+            if request.path in ('/', url_for('dashboard')):
+                return redirect(url_for('login'))
+            return redirect(url_for('login', next=request.path))
+            
+        if g.user.get('role') != 'lead_dba':
+            if request.path.startswith('/api/') or request.is_json:
+                return jsonify({'success': False, 'error': 'Access Denied: Only Super Admin (Lead DBA) can perform this action.'}), 403
             flash('Access Denied: Only Super Admin (Lead DBA) can perform this action.', 'error')
             return redirect(url_for('dashboard'))
         return view(**kwargs)
@@ -34,14 +74,26 @@ def lead_dba_required(view):
 
 @app.before_request
 def load_logged_in_user():
+    g.was_deactivated = False
     try:
         user_id = session.get('user_id')
         if user_id is None:
             g.user = None
         else:
-            g.user = UserModel.get_by_id(user_id)
+            db_user = UserModel.get_by_id(user_id)
+            if not db_user:
+                session.clear()
+                g.user = None
+            elif not db_user.get('is_active', 1):
+                # Account has been deactivated by admin while logged in
+                g.was_deactivated = True
+                session.clear()
+                g.user = None
+            else:
+                g.user = db_user
     except Exception as e:
         app.logger.error(f"Error loading logged in user: {e}")
+        session.clear()
         g.user = None
 
 def get_client_ip():
@@ -89,7 +141,9 @@ def login():
                         app.logger.warning(f"Failed to record login audit: {log_err}")
 
                     next_url = request.args.get('next')
-                    return redirect(next_url or url_for('dashboard'))
+                    if next_url and next_url.startswith('/') and not next_url.startswith('//'):
+                        return redirect(next_url)
+                    return redirect(url_for('dashboard'))
             else:
                 error = 'Invalid username or password.'
                 try:
@@ -722,6 +776,96 @@ def user_update(user_id):
         flash(f"Error updating user: {str(e)}", 'error')
 
     return redirect(url_for('users_view'))
+
+@app.route('/api/user/change-password', methods=['POST'])
+@login_required
+def change_password():
+    is_json = request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    try:
+        if request.is_json:
+            data = request.get_json() or {}
+            current_password = data.get('current_password', '')
+            new_password = data.get('new_password', '')
+            confirm_password = data.get('confirm_password', '')
+        else:
+            current_password = request.form.get('current_password', '')
+            new_password = request.form.get('new_password', '')
+            confirm_password = request.form.get('confirm_password', '')
+
+        # Fetch fresh user record from database
+        user = UserModel.get_by_id(g.user['id'])
+        if not user:
+            session.clear()
+            if is_json:
+                return jsonify({'success': False, 'error': 'Session expired. Please log in again.'}), 401
+            flash('Session expired. Please log in again.', 'error')
+            return redirect(url_for('login'))
+
+        # Verify current password
+        if not UserModel.verify_password(user['password_hash'], current_password):
+            try:
+                AuditModel.log(
+                    username=user['username'],
+                    action='PASSWORD_CHANGE_FAILED',
+                    target=user['username'],
+                    details='Failed password change: current password incorrect',
+                    ip_address=get_client_ip(),
+                    status='FAILED',
+                    user_id=user['id']
+                )
+            except Exception:
+                pass
+            if is_json:
+                return jsonify({'success': False, 'error': 'Current password is incorrect.'}), 400
+            flash('Current password is incorrect.', 'error')
+            return redirect(request.referrer or url_for('dashboard'))
+
+        # Validate new password
+        if not new_password or len(new_password) < 6:
+            if is_json:
+                return jsonify({'success': False, 'error': 'New password must be at least 6 characters long.'}), 400
+            flash('New password must be at least 6 characters long.', 'error')
+            return redirect(request.referrer or url_for('dashboard'))
+
+        if new_password != confirm_password:
+            if is_json:
+                return jsonify({'success': False, 'error': 'New password and confirmation do not match.'}), 400
+            flash('New password and confirmation do not match.', 'error')
+            return redirect(request.referrer or url_for('dashboard'))
+
+        if current_password == new_password:
+            if is_json:
+                return jsonify({'success': False, 'error': 'New password must be different from current password.'}), 400
+            flash('New password must be different from current password.', 'error')
+            return redirect(request.referrer or url_for('dashboard'))
+
+        UserModel.change_password(user['id'], new_password)
+
+        try:
+            AuditModel.log(
+                username=user['username'],
+                action='PASSWORD_CHANGE',
+                target=user['username'],
+                details='User successfully updated account password',
+                ip_address=get_client_ip(),
+                status='SUCCESS',
+                user_id=user['id']
+            )
+        except Exception as audit_err:
+            app.logger.warning(f"Failed to record password change audit: {audit_err}")
+
+        if is_json:
+            return jsonify({'success': True, 'message': 'Password changed successfully.'})
+
+        flash('Your password has been changed successfully.', 'success')
+        return redirect(request.referrer or url_for('dashboard'))
+
+    except Exception as e:
+        app.logger.error(f"Error changing password: {e}")
+        if is_json:
+            return jsonify({'success': False, 'error': f"Failed to change password: {str(e)}"}), 500
+        flash(f"Error changing password: {str(e)}", 'error')
+        return redirect(request.referrer or url_for('dashboard'))
 
 # Context processor for templates
 @app.context_processor

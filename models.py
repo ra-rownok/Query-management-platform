@@ -321,6 +321,25 @@ class UserModel:
             raise e
 
     @staticmethod
+    def change_password(user_id, new_password):
+        try:
+            try:
+                password_hash = generate_password_hash(new_password, method='pbkdf2:sha256')
+            except Exception:
+                import hashlib
+                password_hash = "sha256$" + hashlib.sha256(new_password.encode('utf-8')).hexdigest()
+            with get_db_connection() as conn:
+                conn.execute(
+                    "UPDATE users SET password_hash = %s WHERE id = %s;",
+                    (password_hash, user_id)
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            print(f"Error changing password for user {user_id}: {e}")
+            raise e
+
+    @staticmethod
     def delete(user_id):
         try:
             with get_db_connection() as conn:

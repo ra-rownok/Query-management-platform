@@ -2,15 +2,194 @@
  * Multi-Database Query Management Platform - Client Application Script
  */
 
+// Global Session & Deactivation Interceptor for asynchronous fetch requests
+(function() {
+    const originalFetch = window.fetch;
+    window.fetch = async function(...args) {
+        try {
+            const response = await originalFetch.apply(this, args);
+            if (response.status === 401) {
+                try {
+                    const cloned = response.clone();
+                    const data = await cloned.json();
+                    if (data && data.error) {
+                        try {
+                            sessionStorage.setItem('deactivated_notice', data.error);
+                        } catch (_) {}
+                    }
+                    if (data && data.redirect) {
+                        window.location.href = data.redirect;
+                        return response;
+                    }
+                } catch (_) {}
+                window.location.href = '/login';
+                return response;
+            }
+            return response;
+        } catch (err) {
+            throw err;
+        }
+    };
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
     try {
+        // Display notice if redirected due to deactivation or session expiration
+        const notice = sessionStorage.getItem('deactivated_notice');
+        if (notice) {
+            sessionStorage.removeItem('deactivated_notice');
+            if (typeof window.showToast === 'function') {
+                window.showToast(notice, 'error', 6000, 'Access Terminated');
+            }
+        }
+
         initTheme();
         initTargetingControls();
         initSqlEditor();
         initQuickTemplates();
         initAutoToasts();
+        initChangePasswordModal();
     } catch (e) {
         console.error('Initialization error:', e);
+    }
+});
+
+// Change Password Modal Handler
+function initChangePasswordModal() {
+    const form = document.getElementById('change-password-form');
+    if (!form) return;
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const alertEl = document.getElementById('change-pwd-alert');
+        const submitBtn = document.getElementById('btn-submit-change-pwd');
+        if (alertEl) {
+            alertEl.style.display = 'none';
+            alertEl.textContent = '';
+        }
+
+        const currentPassword = document.getElementById('current_password')?.value || '';
+        const newPassword = document.getElementById('new_password')?.value || '';
+        const confirmPassword = document.getElementById('confirm_password')?.value || '';
+
+        if (!currentPassword) {
+            if (alertEl) {
+                alertEl.textContent = 'Please enter your current password.';
+                alertEl.style.display = 'block';
+            }
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            if (alertEl) {
+                alertEl.textContent = 'New password must be at least 6 characters.';
+                alertEl.style.display = 'block';
+            }
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            if (alertEl) {
+                alertEl.textContent = 'New passwords do not match.';
+                alertEl.style.display = 'block';
+            }
+            return;
+        }
+
+        if (currentPassword === newPassword) {
+            if (alertEl) {
+                alertEl.textContent = 'New password must be different from current password.';
+                alertEl.style.display = 'block';
+            }
+            return;
+        }
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Updating...';
+        }
+
+        try {
+            const res = await fetch('/api/user/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    current_password: currentPassword,
+                    new_password: newPassword,
+                    confirm_password: confirmPassword
+                })
+            });
+
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+                if (alertEl) {
+                    alertEl.textContent = data.error || 'Failed to update password.';
+                    alertEl.style.display = 'block';
+                } else if (typeof showToast === 'function') {
+                    showToast(data.error || 'Failed to update password', 'error');
+                }
+            } else {
+                form.reset();
+                closeModal('change-password-modal');
+                if (typeof showToast === 'function') {
+                    showToast(data.message || 'Password changed successfully.', 'success', 5000, 'Password Updated');
+                }
+            }
+        } catch (err) {
+            if (alertEl) {
+                alertEl.textContent = err.message || 'Network error encountered.';
+                alertEl.style.display = 'block';
+            }
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Update Password';
+            }
+        }
+    });
+}
+
+// User Profile Dropdown Management
+window.toggleUserDropdown = function(e) {
+    if (e) {
+        e.stopPropagation();
+        e.preventDefault();
+    }
+    const menu = document.getElementById('user-dropdown-menu');
+    const trigger = document.getElementById('user-menu-trigger');
+    if (!menu) return;
+    const isShowing = menu.classList.contains('show');
+    if (isShowing) {
+        window.closeUserDropdown();
+    } else {
+        menu.classList.add('show');
+        if (trigger) {
+            trigger.classList.add('active');
+            trigger.setAttribute('aria-expanded', 'true');
+        }
+    }
+};
+
+window.closeUserDropdown = function() {
+    const menu = document.getElementById('user-dropdown-menu');
+    const trigger = document.getElementById('user-menu-trigger');
+    if (menu) menu.classList.remove('show');
+    if (trigger) {
+        trigger.classList.remove('active');
+        trigger.setAttribute('aria-expanded', 'false');
+    }
+};
+
+document.addEventListener('click', function(e) {
+    const container = document.getElementById('user-menu-container');
+    if (container && !container.contains(e.target)) {
+        window.closeUserDropdown();
+    }
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        window.closeUserDropdown();
     }
 });
 

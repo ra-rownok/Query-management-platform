@@ -285,5 +285,61 @@ class TestQueryManagementPlatform(unittest.TestCase):
         self.assertIn(b'SUPER ADMIN SCOPE', res_admin_audit.data)
         self.assertIn(b'auditee_alice', res_admin_audit.data)
 
+    def test_12_change_password(self):
+        # 1. Login as admin
+        self.login_as_admin()
+
+        # 2. Test failed password change: incorrect current password
+        res_bad_curr = self.client.post('/api/user/change-password', data=json.dumps({
+            'current_password': 'wrongpassword',
+            'new_password': 'newsecret123',
+            'confirm_password': 'newsecret123'
+        }), content_type='application/json')
+        self.assertEqual(res_bad_curr.status_code, 400)
+        self.assertIn('Current password is incorrect', res_bad_curr.get_json()['error'])
+
+        # 3. Test failed password change: passwords do not match
+        res_mismatch = self.client.post('/api/user/change-password', data=json.dumps({
+            'current_password': 'admin123',
+            'new_password': 'newsecret123',
+            'confirm_password': 'differentpassword'
+        }), content_type='application/json')
+        self.assertEqual(res_mismatch.status_code, 400)
+        self.assertIn('do not match', res_mismatch.get_json()['error'])
+
+        # 4. Test failed password change: password too short
+        res_short = self.client.post('/api/user/change-password', data=json.dumps({
+            'current_password': 'admin123',
+            'new_password': '123',
+            'confirm_password': '123'
+        }), content_type='application/json')
+        self.assertEqual(res_short.status_code, 400)
+        self.assertIn('at least 6 characters', res_short.get_json()['error'])
+
+        # 5. Test successful password change
+        res_ok = self.client.post('/api/user/change-password', data=json.dumps({
+            'current_password': 'admin123',
+            'new_password': 'newsecret123',
+            'confirm_password': 'newsecret123'
+        }), content_type='application/json')
+        self.assertEqual(res_ok.status_code, 200)
+        self.assertTrue(res_ok.get_json()['success'])
+
+        # 6. Verify old password fails and new password succeeds
+        self.client.get('/logout')
+        res_old = self.client.post('/login', data={'username': 'admin', 'password': 'admin123'}, follow_redirects=True)
+        self.assertIn(b'Invalid username or password', res_old.data)
+
+        res_new = self.client.post('/login', data={'username': 'admin', 'password': 'newsecret123'}, follow_redirects=True)
+        self.assertEqual(res_new.status_code, 200)
+        self.assertIn(b'Query Execution Studio', res_new.data)
+
+        # 7. Revert back to admin123
+        self.client.post('/api/user/change-password', data=json.dumps({
+            'current_password': 'newsecret123',
+            'new_password': 'admin123',
+            'confirm_password': 'admin123'
+        }), content_type='application/json')
+
 if __name__ == '__main__':
     unittest.main()

@@ -105,7 +105,7 @@
                             {{ l.target or '-' }}
                         </td>
                         <td class="log-details-cell">
-                            <div class="log-details-text">{{ l.details or '-' }}</div>
+                            <div class="log-details-text" title="{{ l.details or '' }}" onclick="this.classList.toggle('expanded')">{{ l.details or '-' }}</div>
                         </td>
                         <td style="color: var(--text-dim); font-size: 0.78rem;">
                             {{ l.ip_address }}
