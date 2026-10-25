@@ -880,4 +880,6 @@ def inject_global_data():
 if __name__ == '__main__':
     # Ensure tables exist
     init_app_database()
-    app.run(host='127.0.0.1', port=5001, debug=False)
+    host = os.environ.get('FLASK_HOST', '0.0.0.0' if os.environ.get('DOCKER_CONTAINER') else '127.0.0.1')
+    port = int(os.environ.get('FLASK_PORT', 5001))
+    app.run(host=host, port=port, debug=False)

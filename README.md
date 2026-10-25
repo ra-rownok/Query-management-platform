@@ -98,7 +98,34 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Configure Application Database Engine (PostgreSQL)
+---
+
+## Running with Docker & Docker Compose (Recommended)
+
+You can launch the complete platform (including the PostgreSQL metadata database and the Gunicorn application server) with a single command:
+
+```bash
+docker compose up --build
+```
+
+* **Application URL**: `http://localhost:5001`
+* **Default Admin**: `admin` / `admin123`
+* **PostgreSQL Storage**: Automatically managed in a persistent Docker volume (`quantum_dba_postgres_data`).
+* **Auto-Initialization**: The containerized entrypoint automatically verifies PostgreSQL readiness, executes schema provisioning, and seeds the initial Super Admin account before starting the web server.
+
+To run in the background (detached mode):
+```bash
+docker compose up -d
+```
+
+To stop the containers:
+```bash
+docker compose down
+```
+
+---
+
+## Local Setup (Without Docker)
 The platform uses **PostgreSQL** exclusively for its internal metadata (users, categories, database connections, permissions, audit logs, and query history).
 
 Set your PostgreSQL connection details in `.env`:
@@ -149,11 +176,14 @@ python3 -m unittest tests/test_platform.py
 ## Project Structure
 
 ```
+├── Dockerfile                 # Multi-stage production container definition
+├── docker-compose.yml         # Container orchestration (Web + PostgreSQL)
+├── entrypoint.sh              # Container startup, DB readiness & seeder script
 ├── app.py                     # Flask application routes, decorators & auth
 ├── models.py                  # Database schemas, UserModel, PermissionModel, AuditModel
 ├── db_manager.py              # Engine dialect helper, connection factory, concurrent executor
 ├── init_db.py                 # PostgreSQL table provisioning & default admin seeder
-├── requirements.txt           # Python dependencies
+├── requirements.txt           # Python dependencies (Flask, Gunicorn, psycopg2, etc.)
 ├── docs/
 │   └── screenshots/           # Application screenshots and visual assets
 ├── static/
@@ -167,5 +197,5 @@ python3 -m unittest tests/test_platform.py
 │   ├── audit.html             # Immutable audit log stream
 │   └── users.html             # User administration & permission matrix
 └── tests/
-    └── test_platform.py       # 11 unit & integration tests
+    └── test_platform.py       # Comprehensive unit & integration tests
 ```
