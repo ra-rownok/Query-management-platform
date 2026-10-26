@@ -13,15 +13,9 @@ import os
 import sys
 import time
 import psycopg2
+from models import get_database_uri
 
-db_url = os.environ.get('DATABASE_URL')
-if not db_url:
-    user = os.environ.get('POSTGRES_USER', 'postgres')
-    pw = os.environ.get('POSTGRES_PASSWORD', 'postgres')
-    host = os.environ.get('POSTGRES_HOST', 'db')
-    port = os.environ.get('POSTGRES_PORT', '5432')
-    db = os.environ.get('POSTGRES_DB', 'platform_db')
-    db_url = f"postgresql://{user}:{pw}@{host}:{port}/{db}"
+db_url = get_database_uri()
 
 max_retries = 35
 for attempt in range(1, max_retries + 1):

@@ -1,41 +1,24 @@
-services:
-  db:
-    image: postgres:15-alpine
-    container_name: quantum_dba_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-platform_db}
-    ports:
-      - "${HOST_DB_PORT:-5432}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-platform_db}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+# ==============================================================================
+# QuantumDBA Platform - Docker Compose
+# ==============================================================================
+# The web application runs containerized with Gunicorn WSGI.
+# PostgreSQL runs independently as a container or service on the host server.
+# The container connects to the host's PostgreSQL via 'host.docker.internal'.
+# ==============================================================================
 
+services:
   web:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: quantum_dba_web
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-platform_db}
-      SECRET_KEY: ${SECRET_KEY:-multi-db-quant-dba-secret-key-2026-xyz}
-      FLASK_ENV: ${FLASK_ENV:-production}
-      DOCKER_CONTAINER: "1"
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "${HOST_WEB_PORT:-5001}:5001"
     volumes:
       - .:/app
 
-volumes:
-  postgres_data:
-    name: quantum_dba_postgres_data

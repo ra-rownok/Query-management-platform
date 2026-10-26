@@ -102,26 +102,31 @@ pip install -r requirements.txt
 
 ## Running with Docker & Docker Compose (Recommended)
 
-You can launch the complete platform (including the PostgreSQL metadata database and the Gunicorn application server) with a single command:
+The platform web application is fully containerized with Gunicorn WSGI, automated schema provisioning, and database health checks.
+
+### 1. Database Connection Architecture
+
+PostgreSQL runs independently (e.g. as a standalone PostgreSQL container or system service) on the host server. The application container connects to it via Docker's host gateway:
+
+In [`.env`](file:///.env):
+```env
+DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/platform_db
+```
+*(Note: `host.docker.internal` routes traffic from inside the application container to the host server's PostgreSQL container/port `5432`).*
+
+### 2. Build & Launch Platform
 
 ```bash
-docker compose up --build
+# Build and run web container in detached mode
+docker compose up --build -d
 ```
 
 * **Application URL**: `http://localhost:5001`
 * **Default Admin**: `admin` / `admin123`
-* **PostgreSQL Storage**: Automatically managed in a persistent Docker volume (`quantum_dba_postgres_data`).
-* **Auto-Initialization**: The containerized entrypoint automatically verifies PostgreSQL readiness, executes schema provisioning, and seeds the initial Super Admin account before starting the web server.
+* **Auto-Initialization**: The containerized [`entrypoint.sh`](file:///entrypoint.sh) waits for PostgreSQL readiness, executes schema migrations via [`init_db.py`](file:///init_db.py), seeds the initial Super Admin account, and starts Gunicorn.
 
-To run in the background (detached mode):
-```bash
-docker compose up -d
-```
+---
 
-To stop the containers:
-```bash
-docker compose down
-```
 
 ---
 
